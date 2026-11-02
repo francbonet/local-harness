@@ -86,6 +86,18 @@ describe('modality schema boundary', () => {
 })
 
 describe('request image policy bounds', () => {
+  it('requires an accepted type that can carry alpha', () => {
+    const options = (requestImageMediaTypes: string[]) => ({
+      providers: {
+        'acme-gateway': { api: 'openai-completions', baseURL: 'https://acme.test', models: [{ id: 'm' }], requestImageMediaTypes },
+      },
+    }) as Options
+    expect(() => { assertServiceable(options(['image/jpeg'])) })
+      .toThrow(/requestImageMediaTypes must include image\/png or image\/webp/)
+    expect(() => { assertServiceable(options([])) }).not.toThrow()
+    expect(() => { assertServiceable(options(['image/jpeg', 'image/png'])) }).not.toThrow()
+  })
+
   it.each([
     ['requestImagePixelBudget', 0, /requestImagePixelBudget must be a positive safe integer/],
     ['requestImagePixelBudget', Number.MAX_SAFE_INTEGER + 1, /requestImagePixelBudget must be a positive safe integer/],

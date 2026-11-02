@@ -1134,6 +1134,12 @@ it.each([
   } else await expect(adapter.listModels('deepseek')).rejects.toBe(error)
 })
 
+it('carries the route-accepted image types into the request target', () => {
+  const adapter = adapterOf({ deepseek: { apiKeyEnv: 'PI_TEST_KEY', requestImagePixelBudget: 10_000, requestImageMaxBytes: 50_000, requestImageMediaTypes: ['image/jpeg', 'image/png'] } })
+  expect(adapter.imageRequestTarget('deepseek', 'deepseek-flash', { ...IMAGE_REF, width: 1000, height: 1000 }))
+    .toEqual({ width: 100, height: 100, maxBytes: 50_000, mediaTypes: ['image/jpeg', 'image/png'] })
+})
+
 it('resolves the exact pi-ai image budget for screenshot coordinates', () => {
   const adapter = adapterOf({ deepseek: { apiKeyEnv: 'PI_TEST_KEY', requestImagePixelBudget: 10_000, requestImageMaxBytes: 50_000 } })
   expect(adapter.imageRequestTarget('deepseek', 'deepseek-flash', { ...IMAGE_REF, width: 1000, height: 1000 }))

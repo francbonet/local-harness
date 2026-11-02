@@ -140,6 +140,11 @@ interface ImageRequestTarget {
   height: number
   /** Encoded-byte target before base64 expansion or Files API upload; the smallest quality-ladder output is kept when no quality fits. */
   maxBytes: number
+  /**
+   * Media types the route accepts; omission keeps every normalized type. The list
+   * must include `image/png` or `image/webp`, because alpha pixels need an alpha encoder.
+   */
+  mediaTypes?: readonly ImageMediaType[]
 }
 ```
 

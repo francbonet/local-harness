@@ -60,6 +60,7 @@ import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attac
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { requestImageTarget, toPiContext } from './context.ts'
+import type { PiImageRequestBudget } from './context.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
 import { toStreamChunks } from './stream.ts'
 import type { PiAiRequestHeaderContext } from './types.ts'
@@ -134,6 +135,15 @@ export interface PiAiAuthInjection {
   credentials: CredentialStore
   /** Ambient lookups a provider performs while resolving its own auth. */
   authContext: AuthContext
+}
+
+/** Project one profile's request-image limits into the conversion budget. */
+function requestImagePolicy(profile: ResolvedPiAiProviderProfile): PiImageRequestBudget {
+  return {
+    maxPixels: profile.requestImagePixelBudget,
+    maxBytes: profile.requestImageMaxBytes,
+    mediaTypes: profile.requestImageMediaTypes,
+  }
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -281,7 +291,7 @@ export class PiAiAdapter extends LlmAdapter {
     const snapshot = this.current()
     this.modelOf(snapshot, provider, model)
     const profile = this.profileOf(snapshot, provider)
-    return requestImageTarget(image, { maxPixels: profile.requestImagePixelBudget, maxBytes: profile.requestImageMaxBytes })
+    return requestImageTarget(image, requestImagePolicy(profile))
   }
 
   /**
@@ -450,10 +460,7 @@ export class PiAiAdapter extends LlmAdapter {
           attachments,
           resolveImageAccess: ref => this.config.resolveImageAccess?.(attachments, ref),
           maxRequestImageBytes: profile.maxRequestImageBytes,
-          requestImagePolicy: {
-            maxPixels: profile.requestImagePixelBudget,
-            maxBytes: profile.requestImageMaxBytes,
-          },
+          requestImagePolicy: requestImagePolicy(profile),
         }, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
       const events = snapshot.models.streamSimple(model, context, {
         ...profileOptions(profile, reasoning, apiKey),

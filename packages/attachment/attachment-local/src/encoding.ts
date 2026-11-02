@@ -1,6 +1,7 @@
 /** Shared quality ladder and lazy candidate execution for normalization and request-image encoders. */
 
 import type { Sharp } from 'sharp'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 
 /** Shared ladder for both encoders: spaced so each step buys a real size reduction. */
 export const IMAGE_ENCODING_QUALITIES = [85, 75, 60] as const
@@ -10,7 +11,7 @@ export const WEBP_ENCODING_EFFORT = 0
 /** One ladder output carrying its complete bytes and exact facts. */
 export interface EncodedImage {
   data: Uint8Array
-  mediaType: 'image/jpeg' | 'image/webp'
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
   width: number
   height: number
 }
@@ -18,20 +19,30 @@ export interface EncodedImage {
 async function encode(pipeline: Sharp, mediaType: EncodedImage['mediaType'], quality: number): Promise<EncodedImage> {
   const encoded = mediaType === 'image/webp'
     ? pipeline.webp({ quality, effort: WEBP_ENCODING_EFFORT })
-    : pipeline.jpeg({ quality })
+    : mediaType === 'image/jpeg' ? pipeline.jpeg({ quality }) : pipeline.png()
   const { data, info } = await encoded.toBuffer({ resolveWithObject: true })
   return { data: new Uint8Array(data), mediaType, width: info.width, height: info.height }
 }
 
 /**
  * Build the lazy quality ladder for one prepared pipeline: WebP keeps a source
- * alpha channel, everything else is JPEG.
+ * alpha channel, everything else is JPEG. A route list without the preferred
+ * codec moves to the next one; lossless PNG has a single candidate.
  * @param prepared - sized sRGB pipeline; cloned per candidate.
  * @param hasAlpha - decoded source alpha fact selecting the codec.
+ * @param mediaTypes - route-accepted types including `image/png` or `image/webp`; omission accepts all.
  * @returns encoders ordered from highest to lowest ladder quality.
  */
-export function encodingLadder(prepared: Sharp, hasAlpha: boolean): Array<() => Promise<EncodedImage>> {
-  const mediaType = hasAlpha ? 'image/webp' : 'image/jpeg'
+export function encodingLadder(
+  prepared: Sharp,
+  hasAlpha: boolean,
+  mediaTypes?: readonly ImageMediaType[],
+): Array<() => Promise<EncodedImage>> {
+  const preference: readonly EncodedImage['mediaType'][] = hasAlpha
+    ? ['image/webp', 'image/png']
+    : ['image/jpeg', 'image/webp', 'image/png']
+  const mediaType = preference.find(candidate => mediaTypes?.includes(candidate) ?? true) as EncodedImage['mediaType']
+  if (mediaType === 'image/png') return [() => encode(prepared.clone(), mediaType, 100)]
   return IMAGE_ENCODING_QUALITIES.map(quality => (
     () => encode(prepared.clone(), mediaType, quality)
   ))

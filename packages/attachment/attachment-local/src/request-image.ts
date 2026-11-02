@@ -67,6 +67,7 @@ function descriptor(attachment: ImageAttachmentRef, target: ImageRequestTarget):
       order: ['alpha:webp', 'opaque:jpeg'],
       colourspace: 'srgb',
     },
+    ...target.mediaTypes === undefined ? {} : { mediaTypes: [...target.mediaTypes].sort() },
   })
 }
 
@@ -102,7 +103,8 @@ async function createRequestImage(
 ): Promise<EncodedRequestImage> {
   if (target.width >= attachment.ref.width
     && target.height >= attachment.ref.height
-    && attachment.data.byteLength <= target.maxBytes) {
+    && attachment.data.byteLength <= target.maxBytes
+    && (target.mediaTypes?.includes(attachment.ref.mediaType) ?? true)) {
     return {
       data: attachment.data,
       mediaType: attachment.ref.mediaType,
@@ -111,7 +113,7 @@ async function createRequestImage(
     }
   }
   const encodedVersion = await encodeFirstWithinLimit(
-    encodingLadder(pipeline(attachment, target), hasAlpha),
+    encodingLadder(pipeline(attachment, target), hasAlpha, target.mediaTypes),
     target.maxBytes,
   )
   return isExhaustedEncoding(encodedVersion) ? encodedVersion.smallest : encodedVersion

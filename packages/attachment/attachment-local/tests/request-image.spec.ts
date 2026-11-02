@@ -280,6 +280,38 @@ describe('local request-image cache', () => {
     })
   })
 
+  it('re-encodes a type the route excludes as JPEG, or PNG with alpha, and separates the cache by accepted types', async () => {
+    const attachments = await store()
+    const opaqueSource = new Uint8Array(await sharp({
+      create: { width: 64, height: 48, channels: 3, background: { r: 200, g: 10, b: 10 } },
+    }).webp({ lossless: true }).toBuffer())
+    const alphaSource = new Uint8Array(await sharp({
+      create: { width: 64, height: 48, channels: 4, background: { r: 10, g: 10, b: 200, alpha: 0.5 } },
+    }).webp({ lossless: true }).toBuffer())
+    const opaque = await attachments.saveImage({ data: opaqueSource, mediaType: 'image/webp' })
+    const alpha = await attachments.saveImage({ data: alphaSource, mediaType: 'image/webp' })
+    const target = { width: 64, height: 48, maxBytes: 1024 * 1024 }
+    const mediaTypes = ['image/jpeg', 'image/png'] as const
+
+    const inherited = await attachments.readImageRequest(opaque, target)
+    const jpeg = await attachments.readImageRequest(opaque, { ...target, mediaTypes })
+    const png = await attachments.readImageRequest(alpha, { ...target, mediaTypes })
+    const webpAllowed = await attachments.readImageRequest(opaque, { ...target, mediaTypes: ['image/webp', 'image/png'] })
+    const pngOnly = await attachments.readImageRequest(opaque, { ...target, mediaTypes: ['image/png'] })
+    const cached = await attachments.readImageRequest(opaque, { ...target, mediaTypes: ['image/png', 'image/jpeg'] })
+
+    expect(opaque.mediaType).toBe('image/webp')
+    expect(inherited.mediaType).toBe('image/webp')
+    expect(jpeg).toMatchObject({ mediaType: 'image/jpeg', width: 64, height: 48, hasAlpha: false })
+    expect((await sharp(jpeg.data).metadata()).format).toBe('jpeg')
+    expect(png).toMatchObject({ mediaType: 'image/png', width: 64, height: 48, hasAlpha: true })
+    expect((await sharp(png.data).metadata()).format).toBe('png')
+    expect(webpAllowed.mediaType).toBe('image/webp')
+    expect(pngOnly.mediaType).toBe('image/png')
+    expect(inherited.variantId).not.toBe(jpeg.variantId)
+    expect(cached.variantId).toBe(jpeg.variantId)
+  })
+
   it('accepts a resized WebP request version that omits an all-opaque alpha plane', async () => {
     const attachments = await store()
     const source = await complexOpaqueAlphaImage(64, 32)

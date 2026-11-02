@@ -85,6 +85,7 @@ kind: "package-reference"
 | `defaultMaxTokens` | `128,000` | 未描述模型的输出上限回退 |
 | `requestImagePixelBudget` | `4,194,304` | 每张确定性请求图片的总像素预算 |
 | `requestImageMaxBytes` | `1 MiB` | 每张请求图片在 base64 扩展前的编码字节目标 |
+| `requestImageMediaTypes` | 所有规范化类型 | 端点在请求图片中接受的媒体类型；其他图片重新编码为 JPEG，带 alpha 时编码为 PNG。必须包含 `image/png` 或 `image/webp`；LM Studio 需要 `[image/jpeg, image/png]` |
 | `maxRequestImageBytes` | `20 MiB` | base64 图片载荷总上限，保留图片超过时请求以 `IMAGE_OFFLOAD_REQUIRED` 失败 |
 | `retryPolicy` | normal，5 次重试 | 由 `dsh-llm-retry` 执行的提供方自有重试策略 |
 

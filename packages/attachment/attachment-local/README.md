@@ -76,7 +76,7 @@ This section explains the durability and verification design behind the storage,
 
 - **Durability by fsync chain, not existence.** A synced file alone does not survive a crash when its directory entry never reached storage, so the write path syncs every ancestor entry to a process-proven boundary before a reference can reach a session checkpoint.
 - **Normalize once, project per route.** Admission persists one provider-independent normalized attachment; request projection derives deterministic variants without rewriting durable history.
-- **Lazy alpha-routed encoding.** Alpha images use WebP and opaque images use JPEG; quality candidates run in 85/75/60 order, and the smallest output is retained when none meets the encoded-byte target.
+- **Lazy alpha-routed encoding.** Alpha images use WebP and opaque images use JPEG, unless a request target's `mediaTypes` excludes that codec and selects PNG; quality candidates run in 85/75/60 order, and the smallest output is retained when none meets the encoded-byte target.
 - **Limits are write-time policy.** Byte, total-pixel, and per-side dimension limits bind admission only, so tightening them later never makes admitted history unreadable.
 
 ### Write and read paths

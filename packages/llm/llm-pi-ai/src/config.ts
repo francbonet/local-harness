@@ -17,6 +17,7 @@ import type { Volatile } from '@deepseek-ai/cordis'
 import type { CacheRetention, ChatTemplateKwargValue, ModelThinkingLevel, Provider, ThinkingBudgets, Transport } from '@earendil-works/pi-ai'
 import z from '@deepseek-ai/schemastery'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
@@ -178,6 +179,12 @@ export interface PiAiProviderProfile {
    * the smallest quality-ladder output is used when no quality fits.
    */
   requestImageMaxBytes?: number
+  /**
+   * Media types this endpoint accepts in request images; omission sends every
+   * normalized type. Images in any other type are re-encoded as JPEG, or PNG
+   * with alpha, for endpoints such as LM Studio that reject WebP.
+   */
+  requestImageMediaTypes?: ImageMediaType[]
   /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
   retryPolicy?: RetryPolicyConfig
 }
@@ -345,6 +352,7 @@ const profile = z.object({
   maxRequestImageBytes: z.number().step(1).min(1).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES),
   requestImagePixelBudget: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_PIXEL_BUDGET),
   requestImageMaxBytes: z.number().step(1).min(1).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES),
+  requestImageMediaTypes: z.array(z.union(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])),
   retryPolicy: RetryPolicySchema,
 })
 
@@ -446,6 +454,12 @@ export function resolveProfiles(
     if (!Number.isSafeInteger(requestImageMaxBytes) || requestImageMaxBytes <= 0) {
       throw new Error(`llm-pi-ai: provider "${provider}" requestImageMaxBytes must be a positive safe integer`)
     }
+    // The schema fills an absent list with `[]`, so an empty list means no restriction.
+    const requestImageMediaTypes = source.requestImageMediaTypes ?? []
+    if (requestImageMediaTypes.length > 0
+      && !requestImageMediaTypes.some(mediaType => mediaType === 'image/png' || mediaType === 'image/webp')) {
+      throw new Error(`llm-pi-ai: provider "${provider}" requestImageMediaTypes must include image/png or image/webp`)
+    }
     // Detached from the configuration object because pi-ai types `Model.input`
     // mutable. The schema's explicit default covers an absent key, so an empty
     // list here is always one someone typed — and unlike an entry's, nothing
@@ -487,7 +501,10 @@ export function resolveProfiles(
       if (validation === 'strict' || !(error instanceof PiAiCatalogError)) throw error
       catalogError ??= error.message
     }
-    const { apiKeyEnv, retryPolicy, models: _models, displayName: _displayName, ...rest } = source
+    const {
+      apiKeyEnv, retryPolicy, models: _models, displayName: _displayName,
+      requestImageMediaTypes: _requestImageMediaTypes, ...rest
+    } = source
     resolved.set(provider, {
       ...rest,
       provider,
@@ -497,6 +514,7 @@ export function resolveProfiles(
       maxRequestImageBytes,
       requestImagePixelBudget,
       requestImageMaxBytes,
+      ...requestImageMediaTypes.length === 0 ? {} : { requestImageMediaTypes },
       retryPolicy: resolveRetryPolicy(retryPolicy, `llm-pi-ai: provider "${provider}" retryPolicy`),
       ...rest.headers === undefined ? {} : { headers: { ...rest.headers } },
       ...rest.thinkingBudgets === undefined ? {} : { thinkingBudgets: { ...rest.thinkingBudgets } },
