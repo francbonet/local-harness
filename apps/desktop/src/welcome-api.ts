@@ -66,10 +66,11 @@ export interface WelcomeAuthentication {
 }
 
 /**
- * Decide whether a startup or sign-out requires the welcome entry.
- * @param authentication - current account and independently stored API-key facts.
- * @returns true only when neither authentication route is configured.
+ * Decide whether a startup or sign-out requires the welcome entry. Nautilus runs on local
+ * models, so the workspace opens anonymously: neither an account nor an API key gates it.
+ * @param _authentication - current account and independently stored API-key facts.
+ * @returns false for every authentication state.
  */
-export function needsWelcome(authentication: WelcomeAuthentication): boolean {
-  return !authentication.loggedIn && !authentication.hasApiKey
+export function needsWelcome(_authentication: WelcomeAuthentication): boolean {
+  return false
 }

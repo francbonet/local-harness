@@ -10,6 +10,14 @@ it('keeps private Desktop launchers out of the Host environment inherited by PTC
   expect(environment).toEqual({ PATH: '/user/bin', HOME: '/user' })
 })
 
+it('drops NODE_OPTIONS because Electron Node mode exits on flags it disallows', () => {
+  const environment = { PATH: '/user/bin', NODE_OPTIONS: '--openssl-legacy-provider' }
+  expect(desktopNodeEnvironment('/desktop/electron', undefined, environment)).toEqual({
+    PATH: '/user/bin', ELECTRON_RUN_AS_NODE: '1',
+  })
+  expect(environment.NODE_OPTIONS).toBe('--openssl-legacy-provider')
+})
+
 it('provides private launchers only to package installation processes', () => {
   expect(desktopNodeEnvironment('/desktop/electron', '/desktop/bin', { PATH: '/user/bin' })).toEqual({
     ELECTRON_RUN_AS_NODE: '1',
