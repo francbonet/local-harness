@@ -33,6 +33,7 @@ To run from a repository checkout:
 ```sh
 git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
+nvm use
 pnpm install
 pnpm run build
 pnpm dsh web
