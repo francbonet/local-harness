@@ -25,7 +25,13 @@ interface PlatformSessionEvent {
   readonly session: PlatformSession | null
 }
 
-type DesktopHostEvent = ReadyEvent | FatalEvent | PlatformSessionEvent | {
+interface AgentActivityEvent {
+  readonly type: 'agent-activity'
+  /** Whether any agent is running. */
+  readonly active: boolean
+}
+
+type DesktopHostEvent = ReadyEvent | FatalEvent | PlatformSessionEvent | AgentActivityEvent | {
   readonly type: 'starting'
   readonly runId: PluginOperationRunId
 } | { readonly type: 'shutdown-complete' } | {
@@ -90,6 +96,8 @@ function isDesktopHostEvent(message: unknown): message is DesktopHostEvent {
           && (url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))
       } catch { return false }
     }
+    case 'agent-activity':
+      return typeof candidate.active === 'boolean'
     case 'fatal':
       return typeof candidate.message === 'string' && (candidate.diagnostic === undefined || typeof candidate.diagnostic === 'string')
     case 'update-tasks':
@@ -187,6 +195,7 @@ export class DesktopHostProcess {
    * @param packageManager - Bundled pnpm entry and Node launcher directory, scoped to package operations.
    * @param onPlatformSession - Private credential updates for embedded Platform views.
    * @param onPluginOperation - Optional diagnostic sink; malformed records are ignored without failing the Host.
+   * @param onAgentActivity - Whether any agent is running; receives false when the child stops, fails, or exits.
    */
   constructor(
     private readonly node: string,
@@ -200,6 +209,7 @@ export class DesktopHostProcess {
 
     private readonly onPlatformSession?: (session: PlatformSession | null) => void,
     private readonly onPluginOperation?: (record: PluginOperationRecord) => void,
+    private readonly onAgentActivity?: (active: boolean) => void,
   ) {}
 
   /**
@@ -246,6 +256,7 @@ export class DesktopHostProcess {
       if (message.type === 'starting') this.runId = message.runId
       else if (message.type === 'ready') this.readyResolve({ url: message.url, injections: message.injections })
       else if (message.type === 'platform-session') this.onPlatformSession?.(message.session)
+      else if (message.type === 'agent-activity') this.onAgentActivity?.(message.active)
       else if (message.type === 'shutdown-complete') {
         if (this.stopping) this.shutdownCompleted = true
         else this.fail(new Error('dsh desktop host acknowledged an unrequested shutdown'))
@@ -349,6 +360,7 @@ export class DesktopHostProcess {
     if (child === undefined) return
     this.stopping = true
     this.onPlatformSession?.(null)
+    this.onAgentActivity?.(false)
     if (child.connected) child.send({ type: 'shutdown' }, (error) => { if (error !== null) this.fail(error) })
     const exited = this.exitPromise ?? Promise.resolve()
     const graceful = await exitsWithin(exited, 10_000)
@@ -369,6 +381,7 @@ export class DesktopHostProcess {
   private fail(error: Error): void {
     if (this.runId !== undefined) Object.assign(error, { hostRunId: this.runId })
     this.onPlatformSession?.(null)
+    this.onAgentActivity?.(false)
     this.readyReject(error)
     for (const request of this.controlRequests.values()) request.reject(error)
     this.controlRequests.clear()

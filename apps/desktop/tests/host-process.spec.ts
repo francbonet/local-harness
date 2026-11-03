@@ -350,6 +350,35 @@ it.each([null, 'stable-account'])('carries Platform identity %s over private IPC
   expect(changed).toHaveBeenLastCalledWith(null)
 })
 
+/** A Host whose only optional sink is the agent-activity callback. */
+function activityHost(runtime: string, onAgentActivity: (active: boolean) => void): DesktopHostProcess {
+  const host = new DesktopHostProcess(process.execPath, runtime, runtime, undefined, process.env,
+    undefined, undefined, undefined, undefined, undefined, onAgentActivity)
+  hosts.push(host)
+  return host
+}
+
+it('forwards agent activity and reports it inactive once the Host stops', async () => {
+  const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'", "process.send({ type: 'agent-activity', active: true }); process.send({ type: 'ready'"))
+  const changed = vi.fn()
+  const host = activityHost(runtime, changed)
+  await host.start()
+  expect(changed.mock.calls).toEqual([[true]])
+  await host.stop()
+  expect(changed).toHaveBeenLastCalledWith(false)
+})
+
+it.each([undefined, 'yes', 1])('rejects malformed agent activity %s on private IPC', async (active) => {
+  const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'",
+    `process.send({ type: 'agent-activity', active: ${JSON.stringify(active) ?? 'undefined'} }); process.send({ type: 'ready'`))
+  const changed = vi.fn()
+  const host = activityHost(runtime, changed)
+  await expect(host.start()).rejects.toThrow('invalid IPC event')
+  expect(changed).not.toHaveBeenCalledWith(true)
+  expect(changed).toHaveBeenLastCalledWith(false)
+  await host.stop()
+})
+
 it.each([undefined, '', 7])('rejects malformed Platform account identity %s on private IPC', async (userId) => {
   const session = { origin: 'https://platform.deepseek.com', token: 'fixture-secret', userId }
   const runtime = projectWithHost(HTTP_HOST.replace("process.send({ type: 'ready'",
