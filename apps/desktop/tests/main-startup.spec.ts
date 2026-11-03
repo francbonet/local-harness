@@ -43,6 +43,7 @@ const harness = await vi.hoisted(async () => {
   const windows: FakeWindow[] = []
   let windowFailure: Error | undefined
   const powerMonitor = new EventEmitter()
+  const powerSaveBlocker = { start: vi.fn((_type: 'prevent-app-suspension') => 7), stop: vi.fn((_id: number) => true) }
   const hosts: FakeHost[] = []
   const handlers = new Map<string, InvokeHandler>()
   let pluginsEnabled = false
@@ -170,6 +171,7 @@ const harness = await vi.hoisted(async () => {
       readonly packageManager?: { pnpm: string; nodeBin: string },
       readonly onPlatformSession?: ConstructorParameters<typeof DesktopHostProcess>[8],
       readonly onPluginOperation?: ConstructorParameters<typeof DesktopHostProcess>[9],
+      readonly onAgentActivity?: ConstructorParameters<typeof DesktopHostProcess>[10],
     ) { hosts.push(this) }
   }
   const app = Object.assign(new EventEmitter(), {
@@ -213,7 +215,7 @@ const harness = await vi.hoisted(async () => {
   const shellDialog = { isOpen: false, focus: vi.fn() }
   return {
     failWindow(error: Error) { windowFailure = error },
-    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, nativeTheme, analytics,
+    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, powerSaveBlocker, nativeTheme, analytics,
     trays, FakeTray, backgroundNotice, shellDialog,
     menu, popup, socketHeaders: vi.fn(), loginShell, readLoginShell, updateCheck, updateDownload, updateInstall,
     platformDispose,
@@ -266,6 +268,8 @@ const harness = await vi.hoisted(async () => {
       backgroundNotice.markerPath = undefined
       shellDialog.isOpen = false
       powerMonitor.removeAllListeners()
+      powerSaveBlocker.start.mockClear()
+      powerSaveBlocker.stop.mockClear()
       app.isPackaged = true
       windowFailure = undefined
       pluginsEnabled = false
@@ -322,6 +326,7 @@ vi.mock('electron', () => ({
   } },
   protocol: { registerSchemesAsPrivileged: vi.fn(), handle: harness.protocolHandle },
   powerMonitor: harness.powerMonitor,
+  powerSaveBlocker: harness.powerSaveBlocker,
   Tray: harness.FakeTray,
   nativeImage: { createFromPath: (path: string) => ({ path }) },
 }))
@@ -2336,6 +2341,19 @@ describe('desktop main startup', () => {
     expect(harness.dialog.showMessageBox).toHaveBeenCalledOnce()
     expect((harness.dialog.showMessageBox.mock.calls[0]![0] as MessageBoxOptions).detail).toContain('document missing')
     expect(harness.hosts).toHaveLength(0)
+  })
+
+  it('holds a system-suspension blocker while the Host reports running agents', async () => {
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    harness.prepared.resolve()
+    await harness.hostStarted.promise
+    const report = harness.hosts[0]!.onAgentActivity!
+    report(true)
+    report(true)
+    expect(harness.powerSaveBlocker.start.mock.calls).toEqual([['prevent-app-suspension']])
+    report(false)
+    expect(harness.powerSaveBlocker.stop.mock.calls).toEqual([[7]])
   })
 
   it('writes operation history under the instance userData instead of the shared logs directory', async () => {
