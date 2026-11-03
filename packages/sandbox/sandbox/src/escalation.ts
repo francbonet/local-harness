@@ -43,20 +43,20 @@ export const ESCALATION_TARGETS: readonly SandboxMode[] = ['workspace-write', 'd
 
 /**
  * Validate the escalation argument pairing a tool schema cannot express:
- * `sandbox_permissions` and `justification` travel together — an approval
- * prompt without a reason, or a reason driving nothing, is a malformed ask —
- * and the justification must be a non-empty sentence.
+ * `sandbox_permissions` requires a non-empty `justification`, because an
+ * approval prompt without a reason is a malformed ask. A `justification`
+ * without `sandbox_permissions` requests nothing and is ignored, whatever its
+ * text; models routinely fill it as a change description, and ignoring it
+ * never widens access.
  * @param sandboxPermissions - the raw `sandbox_permissions` argument, if given.
  * @param justification - the raw `justification` argument, if given.
  */
 export function validateEscalationArgs(sandboxPermissions: string | undefined, justification: string | undefined): void {
-  if (sandboxPermissions !== undefined && justification === undefined) {
+  if (sandboxPermissions === undefined) return
+  if (justification === undefined) {
     throw new Error('invalid escalation: sandbox_permissions requires a justification')
   }
-  if (justification !== undefined && sandboxPermissions === undefined) {
-    throw new Error('invalid escalation: justification is only valid together with sandbox_permissions')
-  }
-  if (justification !== undefined && justification.trim().length === 0) {
+  if (justification.trim().length === 0) {
     throw new Error('invalid justification: expected a non-empty sentence')
   }
 }

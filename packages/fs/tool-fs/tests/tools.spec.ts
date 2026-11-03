@@ -995,13 +995,13 @@ describe('sandbox escalation API (write/edit)', () => {
     expect(text(result)).toContain('retry this exact operation once with sandbox_permissions')
   })
 
-  it('keeps read-only denials when an ordinary write includes a blank reason', async () => {
+  it.each(['', 'Create the notes file.'])('keeps read-only denials when an ordinary write includes reason %j', async (justification) => {
     const { ctx, fs } = await setupConfining({ approval: true })
     try {
       const approval = vi.fn(() => Promise.resolve('allowed-once' as const))
       ctx.on('approval/request', approval)
       fs.rejectWith = new FsError('denied', 'FS_SANDBOX_DENIED')
-      const result = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', justification: '' },
+      const result = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', justification },
         escalationAgent([{ type: 'sandbox/mode', data: { mode: 'read-only' } }]))
       expect(result.isError).toBe(true)
       expect(text(result)).toContain('[sandbox: file access denied under read-only mode]')
@@ -1052,13 +1052,13 @@ describe('sandbox escalation API (write/edit)', () => {
     }])
   })
 
-  it.each(['workspace-write', 'danger-full-access'] as const)('writes and edits under %s with absent or blank unused reasons', async (mode) => {
+  it.each(['workspace-write', 'danger-full-access'] as const)('writes and edits under %s with absent, blank, or non-empty unused reasons', async (mode) => {
     const { ctx, fs } = await setupConfining({ approval: true })
     try {
       const approval = vi.fn(() => Promise.resolve('allowed-once' as const))
       ctx.on('approval/request', approval)
       const agent = escalationAgent([{ type: 'sandbox/mode', data: { mode } }])
-      for (const [index, justification] of ['', undefined, ' \t\n'].entries()) {
+      for (const [index, justification] of ['', undefined, ' \t\n', 'Update the configuration.'].entries()) {
         for (const repeatMode of [true, false]) {
           const file_path = `unused-reason-${index}-${repeatMode}.txt`
           const args = {
@@ -1073,7 +1073,7 @@ describe('sandbox escalation API (write/edit)', () => {
           expect(fs.files.get(`key:${file_path}`)).toBe('after')
         }
       }
-      expect(fs.stamped).toHaveLength(12)
+      expect(fs.stamped).toHaveLength(16)
       expect(fs.stamped.every(policy => policy?.mode === mode && policy.workspaceRoot === '/session-project')).toBe(true)
       expect(approval).not.toHaveBeenCalled()
     } finally {
@@ -1126,14 +1126,11 @@ describe('sandbox escalation API (write/edit)', () => {
     expect(text(result)).toContain('no agent to route it through')
   })
 
-  it('rejects the escalation argument pairing (one field without the other)', async () => {
+  it('rejects sandbox_permissions without a justification', async () => {
     const { ctx } = await setupConfining()
     const missing = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', sandbox_permissions: 'danger-full-access' }, escalationAgent())
     expect(missing.isError).toBe(true)
     expect(text(missing)).toContain('sandbox_permissions requires a justification')
-    const orphan = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', justification: 'why' }, escalationAgent())
-    expect(orphan.isError).toBe(true)
-    expect(text(orphan)).toContain('justification is only valid together with sandbox_permissions')
   })
 
   it('sandbox_permissions under a non-confining backend fails closed (unadvertised field still reaches execute)', async () => {

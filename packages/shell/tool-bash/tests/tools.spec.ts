@@ -752,14 +752,13 @@ describe('sandbox escalation through the generic task producer', () => {
 
     for (const args of [
       { command: 'true', description: 'd', sandbox_permissions: 'workspace-write' },
-      { command: 'true', description: 'd', justification: 'why' },
       { command: 'true', description: 'd', sandbox_permissions: 'workspace-write', justification: ' ' },
     ]) {
       expect((await call(ctx, 'bash', args)).isError).toBe(true)
     }
   })
 
-  it.each([undefined, '', ' \t\n'])('runs without escalation for justification %j', async (justification) => {
+  it.each([undefined, '', ' \t\n', 'List the workspace files.'])('runs without escalation for justification %j', async (justification) => {
     const { ctx, bash } = await setupSandboxed(true)
     try {
       const prompted = vi.fn()

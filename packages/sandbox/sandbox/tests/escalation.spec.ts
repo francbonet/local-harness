@@ -36,9 +36,12 @@ describe('validateEscalationArgs', () => {
     expect(() => { validateEscalationArgs('workspace-write', 'because the workspace needs it') }).not.toThrow()
   })
 
-  it('rejects one field without the other, and a blank justification', () => {
+  it.each(['', ' \t\n', 'Update the sprite drawing logic.'])('ignores justification %j without sandbox_permissions', (justification) => {
+    expect(() => { validateEscalationArgs(undefined, justification) }).not.toThrow()
+  })
+
+  it('rejects sandbox_permissions without a non-empty justification', () => {
     expect(() => { validateEscalationArgs('workspace-write', undefined) }).toThrow(/requires a justification/)
-    expect(() => { validateEscalationArgs(undefined, 'orphan reason') }).toThrow(/only valid together with sandbox_permissions/)
     expect(() => { validateEscalationArgs('workspace-write', '   ') }).toThrow(/non-empty sentence/)
   })
 })

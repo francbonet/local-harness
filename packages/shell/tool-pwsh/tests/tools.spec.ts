@@ -657,11 +657,22 @@ describe('sandbox escalation through ctx.approval', () => {
 
     for (const args of [
       { command: 'Write-Output ok', description: 'd', sandbox_permissions: 'workspace-write' },
-      { command: 'Write-Output ok', description: 'd', justification: 'why' },
       { command: 'Write-Output ok', description: 'd', sandbox_permissions: 'workspace-write', justification: ' ' },
     ]) {
       expect((await call(ctx, 'pwsh', args)).isError).toBe(true)
     }
+  })
+
+  it('ignores a justification without sandbox_permissions and runs under the standing mode', async () => {
+    const { ctx, bash } = await setupSandboxed(true)
+    const prompted = vi.fn()
+    ctx.on('approval/request', () => { prompted(); return Promise.resolve<ApprovalOutcome>('allowed-once') })
+    for (const justification of ['', 'Print a greeting.']) {
+      const result = await call(ctx, 'pwsh', { command: 'Write-Output ok', description: 'd', justification }, sandboxAgent('workspace-write'))
+      expect(result.isError, text(result)).toBe(false)
+    }
+    expect(bash.modes).toEqual(['workspace-write', 'workspace-write'])
+    expect(prompted).not.toHaveBeenCalled()
   })
 
   it('the escalation fields and the confined-mode clauses stay out of sandbox-less compositions', async () => {

@@ -2512,7 +2512,6 @@ describe('per-program execution controls', () => {
 
   it.each([
     { sandbox_permissions: 'workspace-write' },
-    { justification: 'Need writes' },
     { sandbox_permissions: 'workspace-write', justification: ' ' },
     { sandbox_permissions: 'read-only', justification: 'No widening' },
   ])('rejects invalid escalation pairing or mode: %j', async (args) => {
@@ -2533,6 +2532,18 @@ describe('per-program execution controls', () => {
       expect((await execute({ sandbox_permissions: 'workspace-write', justification: 'Write generated source' })).isError).toBe(true)
       expect(runtime.lastRequest).toBeUndefined()
       expect(session.snapshotEvents().filter(event => event.type === 'approval/decided').map(event => event.data)).toMatchObject([{ outcome }])
+    } finally { await ctx.fiber.dispose() }
+  })
+
+  it.each(['', 'Generate the level data.'])('ignores justification %j without sandbox_permissions', async (justification) => {
+    const { ctx, runtime, agent, execute } = await controlledSetup()
+    const ask = vi.fn(() => Promise.resolve<ApprovalOutcome>('allowed-once'))
+    ctx.on('approval/request', ask)
+    try {
+      expect((await execute({ justification })).isError).toBe(false)
+      expect(runtime.lastRequest?.stateOwner).toBe(agent)
+      expect(runtime.lastRequest?.sandboxPolicy?.mode).toBe('read-only')
+      expect(ask).not.toHaveBeenCalled()
     } finally { await ctx.fiber.dispose() }
   })
 

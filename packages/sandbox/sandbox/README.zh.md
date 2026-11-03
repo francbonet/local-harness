@@ -96,7 +96,7 @@ kind: "package-reference"
 
 ### 升权编排
 
-阶梯是封闭表——`read-only` 可升权到 `workspace-write` 或 `danger-full-access`，`workspace-write` 只能升权到 `danger-full-access`——在执行时检查，绝不写入工具 schema，schema 的枚举保持封闭的目标词汇。[`approveEscalation`](src/escalation.ts) 在请求重复当前模式时无需审批就返回该模式，拒绝更窄或不支持的目标，并为更宽模式请求审批。调用方先校验 `sandbox_permissions`/`justification` 配对。
+阶梯是封闭表——`read-only` 可升权到 `workspace-write` 或 `danger-full-access`，`workspace-write` 只能升权到 `danger-full-access`——在执行时检查，绝不写入工具 schema，schema 的枚举保持封闭的目标词汇。[`approveEscalation`](src/escalation.ts) 在请求重复当前模式时无需审批就返回该模式，拒绝更窄或不支持的目标，并为更宽模式请求审批。调用方先用 [`validateEscalationArgs`](src/escalation.ts) 校验 `sandbox_permissions`/`justification` 配对：指定模式时必须提供非空理由，没有模式的理由会被忽略。
 
 ### 可写根目录
 
