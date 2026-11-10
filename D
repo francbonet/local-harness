@@ -1,0 +1,16 @@
+## Comments on MR !1
+
+**Project:** bfbs/bfbs-ctv
+
+**/private/tmp/claude-501/-Users-francescperez-Documents-local-harness/2e573a3c-3fb4-47b1-ab8a-d5df443466ba/scratchpad/wait-test/D.txt** ():
+/private/tmp/claude-501/-Users-francescperez-Documents-local-harness/2e573a3c-3fb4-47b1-ab8a-d5df443466ba/scratchpad/wait-test/D.txt
+
+---
+
+**GitLabDuo** (2026-11-08T14:23:49.492Z):
+I finished my review and found nothing to comment on. Nice work! :tada:
+
+---
+
+**ai-merge-simpson-beta-bfbs** (2026-11-08T14:57:49.520Z):
+System message: ⏳ I have now started my review
